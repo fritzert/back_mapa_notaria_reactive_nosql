@@ -1,8 +1,6 @@
 package com.frodas.notaria.mapa.controller;
 
 import com.frodas.notaria.mapa.dto.DistritoGis;
-import com.frodas.notaria.mapa.dto.DistritoInfo;
-import com.frodas.notaria.mapa.exception.ModeloNotFoundException;
 import com.frodas.notaria.mapa.service.NotariaService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;

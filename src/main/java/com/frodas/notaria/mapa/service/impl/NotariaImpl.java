@@ -9,6 +9,7 @@ import com.frodas.notaria.mapa.service.NotariaService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.Arrays;
@@ -36,7 +37,7 @@ public class NotariaImpl implements NotariaService {
 
     @Override
     public Mono<DistritoGis> listarDistritos() {
-        List<Caracteristica> list = distritoRepo.findAllByHabilitado(Boolean.TRUE).stream()
+        return distritoRepo.findAllByHabilitado(Boolean.TRUE)
                 .map(x ->
                         new Caracteristica(FEATURE,
                                 new Propiedades(x.getCodigo(), x.getNombre(),
@@ -45,33 +46,29 @@ public class NotariaImpl implements NotariaService {
                                         x.getUrlImg()
                                 ),
                                 new Geometria(POINT, Arrays.asList(x.getCoordLongitud(), x.getCoordLatitud())))
-
-                )
-                .collect(Collectors.toList());
-        return new DistritoGis(FEATURE_COLLECTION, list);
+                ).collectList()
+                .flatMap(u -> {
+                    return Mono.just(new DistritoGis(FEATURE_COLLECTION, u));
+                });
     }
 
     @Override
     public Mono<DistritoInfo> buscarDistritoPorId(String codDistrito) {
-        Optional<DistritoNotarial> op = distritoRepo.findByHabilitadoAndCodigo(Boolean.TRUE, codDistrito);
-        if (op.isEmpty()) {
-            log.info("No se encontro el distrito : " + codDistrito);
-            return new DistritoInfo();
-        }
-        DistritoNotarial distrito = op.get();
-        System.out.println(distrito.toString());
-
-        List<Notaria> lista = notariaRepo.findAllByHabilitadoAndDistritoId(Boolean.TRUE, codDistrito);
-        if (lista.isEmpty()) {
-            log.info("No se encontraron notarias");
-            return new DistritoInfo();
-        }
-        DistritoInfo info = new DistritoInfo(new Propiedades(distrito.getCodigo(), distrito.getNombre(),
-                notariaRepo.countByHabilitadoAndDistritoId(Boolean.TRUE, distrito.getCodigo()).toString(),
-                //distrito.getCantidad().toString()),
-                distrito.getUrlImg()
-        ), lista);
-        return info;
+        return distritoRepo.findByHabilitadoAndCodigo(Boolean.TRUE, codDistrito)
+                .flatMap(dis -> {
+                            return Mono.just(new Propiedades(dis.getCodigo(), dis.getNombre(),
+                                    notariaRepo.countByHabilitadoAndDistritoId(Boolean.TRUE, dis.getCodigo()).toString(),
+                                    //distrito.getCantidad().toString()),
+                                    dis.getUrlImg()));
+                        }
+                )
+                .flatMap(x -> {
+                    return notariaRepo.findAllByHabilitadoAndDistritoId(Boolean.TRUE, codDistrito)
+                            .collectList()
+                            .flatMap(c -> {
+                                return Mono.just(new DistritoInfo(x, c));
+                            });
+                });
     }
 
 }
